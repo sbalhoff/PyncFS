@@ -174,7 +174,7 @@ class MetaFs(Operations):
         meta_file = self._metadata_file(partial)
         with open(meta_file, "rb") as f:
             meta_d = pickle.load(f)
-        return meta_d
+            return meta_d
 
     def _metadata_filename(self, path):
         return '.' + hashlib.md5(path).hexdigest()
