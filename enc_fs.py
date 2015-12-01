@@ -169,13 +169,23 @@ class Passthrough(Operations):
         full_path = self._full_path(path)
         return os.open(full_path, os.O_RDWR | os.O_CREAT, mode)
 
+    #blocklength needs to be moved out of this function
+    #do not need to read from offset 0 either
+    #also need to check whether to append the metadata
     def read(self, path, length, offset, fh):
+        blocklength = 16 #fix this
         print('read offset: %d' % (offset))
-        os.lseek(fh, offset, os.SEEK_SET)
-        data = os.read(fh, length)
-        if not self.is_blacklisted(path) and len(data) > 0:
+        if self.is_blacklisted(path):
+            os.lseek(fh, offset, os.SEEK_SET)
+            return os.read(fh, length)
+
+        os.lseek(fh, 0, os.SEEK_SET)
+        readlength = (offset + length) + (offset + length) % blocklength #what if offest = 0. length = 0?
+        data = os.read(fh, offset + length)
+
+        if len(data) > 0:
             data = self.decrypt_with_metadata(path, data)
-        return data
+        return data[offset:(offset + length)]
 
     def write(self, path, buf, offset, fh):
         print('writing to: ' + path)
