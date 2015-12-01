@@ -85,7 +85,8 @@ class Passthrough(Operations):
         if os.path.isdir(full_path):
             dirents.extend(os.listdir(full_path))
         for r in dirents:
-            yield r
+            if not self.is_blacklisted(os.path.join(path, r)):
+                yield r
 
     def readlink(self, path):
         pathname = os.readlink(self._full_path(path))
@@ -157,7 +158,7 @@ class Passthrough(Operations):
         if partial.startswith("/"):
             partial = partial[1:]
         
-        return partial == enc_keymatter_file or partial == sign_keymatter_file or partial.startswith('metadata/')
+        return partial == enc_keymatter_file or partial == sign_keymatter_file or partial.startswith('metadata')
 
     def open(self, path, flags):
         full_path = self._full_path(path)
