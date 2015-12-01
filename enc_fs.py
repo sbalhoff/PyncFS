@@ -118,8 +118,8 @@ class Passthrough(Operations):
         return os.unlink(self._full_path(path))
 
     def symlink(self, name, target):
-        print('symlink')
-        return os.symlink(name, self._full_path(target))
+        print('symlink %s %s' % (target, name))
+        return os.symlink(target, self._full_path(name))
 
     def rename(self, old, new):
         os.rename(self._metadata_file(old), self._metadata_file(new))
