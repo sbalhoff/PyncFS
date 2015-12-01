@@ -239,7 +239,14 @@ def main(mountpoint, root, encryption_password_in, signing_password_in):
     signing_password = signing_password_in
     FUSE(Passthrough(root), mountpoint, nothreads=True, foreground=True)
 
+def print_usage():
+    print("Usage: enc_fs.py rootdir mountdir encryptionpassword signingpassword")
+
 if __name__ == '__main__':
+    if len(sys.argv) < 5:
+        print_usage()
+        exit()
+
     main(sys.argv[2], sys.argv[1], sys.argv[3], sys.argv[4])
 
 
