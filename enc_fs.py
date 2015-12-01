@@ -1,37 +1,17 @@
 #!/usr/bin/env python
 
 from __future__ import with_statement
-
-from encryptionstore import retrieve_key
-from encryption import encrypt, decrypt, padding_length
-
+from fuse import FUSE, FuseOSError, Operations
 import os
 import sys
 import errno
-import hashlib
 
-from fuse import FUSE, FuseOSError, Operations
-
-enc_keymatter_file = '.enc_keymatter'
-sign_keymatter_file = '.sign_keymatter'
-
-encryption_password = ''
-signing_password = ''
+from encryption_provider import BasicEncryption
 
 class Passthrough(Operations):
-    def __init__(self, root):
-        global encryption_password
-        global signing_password
-        global enc_keymatter_file
-        global sign_keymatter_file
+    def __init__(self, root, encryption_password, signing_password):
         self.root = root
-        self.encryption_key = retrieve_key(encryption_password, self._full_path(enc_keymatter_file))
-        self.signing_key = retrieve_key(signing_password, self._full_path(sign_keymatter_file))
-        self.metadata_header_length = 80
-
-        #todo: securely clear the passwords
-        encryption_password = ''
-        signing_password = ''
+        self.enc_provider = BasicEncryption(self, encryption_password, signing_password)
 
     # Helpers
     # =======
@@ -41,20 +21,6 @@ class Passthrough(Operations):
             partial = partial[1:]
         path = os.path.join(self.root, partial)
         return path
-
-    def _metadata_filename(self, partial):
-        return '.' + hashlib.md5(partial).hexdigest()
-
-    def _metadata_file(self, partial):
-        if partial.startswith("/"):
-            partial = partial[1:]
-
-        #has a race condition, but good enough for now
-        metadatadir = os.path.join(self.root, 'metadata')
-        if not os.path.exists(metadatadir):
-            os.makedirs(metadatadir)
-
-        return os.path.join(metadatadir, self._metadata_filename(partial))
 
     # Filesystem methods
     # ==================
@@ -122,8 +88,7 @@ class Passthrough(Operations):
         return os.symlink(target, self._full_path(name))
 
     def rename(self, old, new):
-        os.rename(self._metadata_file(old), self._metadata_file(new))
-        return os.rename(self._full_path(old), self._full_path(new))
+        return self.enc_provider.rename(self._full_path(old), self._full_path(new))
 
     def link(self, target, name):
         print('link')
@@ -137,28 +102,8 @@ class Passthrough(Operations):
     # File methods
     # ============
 
-    def decrypt_with_metadata(self, path, data):
-        print('decrypt path: ' + path)
-        metafilepath = self._metadata_file(path)
-        metafile = open(metafilepath, 'r')
-        metadata = metafile.read()
-        data = metadata[:self.metadata_header_length] + data + metadata[self.metadata_header_length:]
-        metafile.close()
-        return decrypt(data, self.encryption_key, self.signing_key)
-
-    #enc_data format: 64 byte digest, 16 byte iv, actual encrypted data, padding on the end
-    def write_metadata_file(self, path, enc_data, padlength):
-        metafilepath = self._metadata_file(path)
-        metafile = open(metafilepath, 'w')
-        metafile.write(enc_data[0:self.metadata_header_length] + enc_data[(-1 * padlength):])
-
     def is_blacklisted(self, partial):
-        global enc_keymatter_file
-        global sign_keymatter_file
-        if partial.startswith("/"):
-            partial = partial[1:]
-        
-        return partial == enc_keymatter_file or partial == sign_keymatter_file or partial.split('/')[0] == 'metadata'
+        return self.enc_provider.is_blacklisted_file(partial)
 
     def open(self, path, flags):
         full_path = self._full_path(path)
@@ -169,61 +114,23 @@ class Passthrough(Operations):
         full_path = self._full_path(path)
         return os.open(full_path, os.O_RDWR | os.O_CREAT, mode)
 
-    #blocklength needs to be moved out of this function
-    #do not need to read from offset 0 either
-    #also need to check whether to append the metadata
     def read(self, path, length, offset, fh):
-        blocklength = 16 #fix this
         print('read offset: %d' % (offset))
+
         if self.is_blacklisted(path):
             os.lseek(fh, offset, os.SEEK_SET)
             return os.read(fh, length)
 
-        os.lseek(fh, 0, os.SEEK_SET)
-
-        readlength = offset + length
-        if readlength % blocklength != 0:
-            readlength = readlength + blocklength - readlength % blocklength
-
-        data = os.read(fh, readlength)
-        if len(data) > 0:
-            data = self.decrypt_with_metadata(path, data)
-        return data[offset:(offset + length)]
+        return self.enc_provider.read(self._full_path(path), length, offset, fh)
 
     def write(self, path, buf, offset, fh):
         print('writing to: ' + path)
-
-        fullpath = self._full_path(path)
 
         if self.is_blacklisted(path):
             os.lseek(fh, offset, os.SEEK_SET)
             return os.write(fh, buf)
 
-        #compute the entire plaintext to be written to the file
-        #currently does not support writing less than the entire file
-        plaintext = buf
-        try:
-            f = open(fullpath, 'r')
-            data = f.read()
-
-            #prevent useless metadata files. should clean them on deletes / truncates
-            if len(data) > 0:
-                data = self.decrypt_with_metadata(path, data)
-                plaintext = data[:offset] + buf + data[(offset + len(buf)):]
-            f.close()
-        except IOError:
-            plaintext = buf
-        
-        #encrypt and write the metadata file
-        filedata = encrypt(plaintext, self.encryption_key, self.signing_key)
-        padlength = padding_length(len(plaintext))
-        self.write_metadata_file(path, filedata, padlength)
-
-        #write the actual file. The first 80 bytes of filedata are the 
-        #hex digest + the iv. The last "padlength" bytes are block padding
-        os.lseek(fh, 0, os.SEEK_SET)
-        bytes_written = os.write(fh, filedata[self.metadata_header_length:(-1*padlength)])
-        return min(len(buf), bytes_written)
+        return self.enc_provider.write(self._full_path(path), buf, offset, fh)
 
     def truncate(self, path, length, fh=None):
         full_path = self._full_path(path)
@@ -244,11 +151,9 @@ class Passthrough(Operations):
 
 
 def main(mountpoint, root, encryption_password_in, signing_password_in):
-    global encryption_password
-    global signing_password
     encryption_password = encryption_password_in
     signing_password = signing_password_in
-    FUSE(Passthrough(root), mountpoint, nothreads=True, foreground=True)
+    FUSE(Passthrough(root, encryption_password_in, signing_password_in), mountpoint, nothreads=True, foreground=True)
 
 def print_usage():
     print("Usage: enc_fs.py rootdir mountdir encryptionpassword signingpassword")
@@ -259,5 +164,3 @@ if __name__ == '__main__':
         exit()
 
     main(sys.argv[2], sys.argv[1], sys.argv[3], sys.argv[4])
-
-
