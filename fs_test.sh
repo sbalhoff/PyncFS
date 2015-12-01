@@ -61,6 +61,10 @@ echo "write"
 echo "success" > $test_dir/write_test
 check_success
 
+echo "write offset"
+dd if=/dev/zero of=$test_dir/offset_test seek=1000 count=2000 1>/dev/null 2>1
+check_success
+
 echo "read"
 cat $test_dir/write_test > /dev/null
 check_success
