@@ -20,19 +20,21 @@ class BasicEncryption():
         enc_pass = ''
         sign_pass = ''
 
-    def _metadata_filename(self, partial):
-        return '.' + hashlib.md5(partial).hexdigest()
+    def _metadata_filename(self, path):
+        return '.' + hashlib.md5(path).hexdigest()
 
-    def _metadata_file(self, partial):
-        if partial.startswith("/"):
-            partial = partial[1:]
+    def _metadata_file(self, path):
+        #should probably strip leading and trailing slashes
+        # since this is a full filename now
+        if path.startswith("/"):
+            path = path[1:]
 
         #has a race condition, but good enough for now
-        metadatadir = os.path.join(self.fs.root, 'metadata')
+        metadatadir = self.fs._full_path('metadata')
         if not os.path.exists(metadatadir):
             os.makedirs(metadatadir)
 
-        return os.path.join(metadatadir, self._metadata_filename(partial))
+        return os.path.join(metadatadir, self._metadata_filename(path))
 
     def decrypt_with_metadata(self, path, data):
         print('decrypt path: ' + path)
