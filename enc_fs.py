@@ -8,19 +8,10 @@ import errno
 
 from encryption_provider import BasicEncryption
 
-encryption_password = ''
-signing_password = ''
-
 class Passthrough(Operations):
-    def __init__(self, root):
-        global encryption_password
-        global signing_password
+    def __init__(self, root, encryption_password, signing_password):
         self.root = root
         self.enc_provider = BasicEncryption(self, encryption_password, signing_password)
-
-        #todo: securely clear the passwords
-        encryption_password = ''
-        signing_password = ''
 
     # Helpers
     # =======
@@ -97,8 +88,7 @@ class Passthrough(Operations):
         return os.symlink(target, self._full_path(name))
 
     def rename(self, old, new):
-        os.rename(self._metadata_file(old), self._metadata_file(new))
-        return os.rename(self._full_path(old), self._full_path(new))
+        return self.enc_provider.rename(self._full_path(old), self._full_path(new))
 
     def link(self, target, name):
         print('link')
@@ -131,7 +121,7 @@ class Passthrough(Operations):
             os.lseek(fh, offset, os.SEEK_SET)
             return os.read(fh, length)
 
-        return self.enc_provider.read(path, length, offset, fh)
+        return self.enc_provider.read(self._full_path(path), length, offset, fh)
 
     def write(self, path, buf, offset, fh):
         print('writing to: ' + path)
@@ -140,7 +130,7 @@ class Passthrough(Operations):
             os.lseek(fh, offset, os.SEEK_SET)
             return os.write(fh, buf)
 
-        return self.enc_provider.write(path, buf, offset, fh)
+        return self.enc_provider.write(self._full_path(path), buf, offset, fh)
 
     def truncate(self, path, length, fh=None):
         full_path = self._full_path(path)
@@ -161,11 +151,9 @@ class Passthrough(Operations):
 
 
 def main(mountpoint, root, encryption_password_in, signing_password_in):
-    global encryption_password
-    global signing_password
     encryption_password = encryption_password_in
     signing_password = signing_password_in
-    FUSE(Passthrough(root), mountpoint, nothreads=True, foreground=True)
+    FUSE(Passthrough(root, encryption_password_in, signing_password_in), mountpoint, nothreads=True, foreground=True)
 
 def print_usage():
     print("Usage: enc_fs.py rootdir mountdir encryptionpassword signingpassword")

@@ -6,9 +6,6 @@ import hashlib
 enc_keymatter_file = '.enc_keymatter'
 sign_keymatter_file = '.sign_keymatter'
 
-encryption_password = ''
-signing_password = ''
-
 class BasicEncryption():
     def __init__(self, fs, enc_pass, sign_pass):
         global enc_keymatter_file
@@ -18,6 +15,10 @@ class BasicEncryption():
         self.encryption_key = retrieve_key(enc_pass, self.fs._full_path(enc_keymatter_file))
         self.signing_key = retrieve_key(sign_pass, self.fs._full_path(sign_keymatter_file))
         self.metadata_header_length = 80
+
+        #todo: securely delete passwords
+        enc_pass = ''
+        sign_pass = ''
 
     def _metadata_filename(self, partial):
         return '.' + hashlib.md5(partial).hexdigest()
@@ -78,12 +79,11 @@ class BasicEncryption():
         return data[offset:(offset + length)]
 
     def write(self, path, buf, offset, fh):
-        fullpath = self.fs._full_path(path)
         #compute the entire plaintext to be written to the file
         #currently does not support writing less than the entire file
         plaintext = buf
         try:
-            f = open(fullpath, 'r')
+            f = open(path, 'r')
             data = f.read()
 
             #prevent useless metadata files. should clean them on deletes / truncates
@@ -104,3 +104,7 @@ class BasicEncryption():
         os.lseek(fh, 0, os.SEEK_SET)
         bytes_written = os.write(fh, filedata[self.metadata_header_length:(-1*padlength)])
         return min(len(buf), bytes_written)
+
+    def rename(self, old, new):
+        os.rename(self._metadata_file(old), self._metadata_file(new))
+        return os.rename(old, new)
