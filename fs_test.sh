@@ -11,18 +11,22 @@ function fail
 {
 	echo "Test Failed"
 	echo ""
-	rm -rf $test_dir
+	
 	#exit -1
 }
 function check_success
 {
 	if [ ! "$?" = "0" ]; then
 		fail
+	else
+		echo "."
 	fi
 }
 
 test_dir=$1/test_dir
+rm -rf $test_dir
 mkdir -p $test_dir
+check_success	
 
 echo "Running tests in $test_dir"
 
@@ -52,7 +56,6 @@ echo "move from outside"
 touch $test_dir/touch_test
 mv $test_dir/touch_test $test_dir/touch_moved
 check_success
-rm $test_dir/touch_moved
 
 echo "write"
 echo "success" > $test_dir/write_test
@@ -66,6 +69,14 @@ echo "read offset"
 yes | head -n 1000 > $test_dir/big
 dd if=$test_dir/big of=$test_dir/big_offset seek=1000 1>/dev/null 2>1
 check_success
+
+echo "symlink"
+pushd $test_dir >/dev/null
+echo "the link" > link_src
+ln -s link_src link_dest
+check_success
+popd >/dev/null
+
 
 
 
