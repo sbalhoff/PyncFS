@@ -9,8 +9,7 @@ fi
 
 function fail
 {
-	echo "Test Failed"
-	echo ""
+	echo "Test Failed"	
 	
 	#exit -1
 }
@@ -21,18 +20,18 @@ function check_success
 	else
 		echo "."
 	fi
+	echo ""
 }
 
 test_dir=$1/test_dir
 rm -rf $test_dir
 mkdir -p $test_dir
-check_success	
 
 echo "Running tests in $test_dir"
 
 echo "Touch"
 touch $test_dir/touch_test
-
+check_success
 if [ ! -e $test_dir/touch_test ]; then
 	fail
 fi
