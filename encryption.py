@@ -22,12 +22,13 @@ def decrypt(content, encryption_key, signing_key):
     cipher = AES.new(encryption_key, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(contents))
 
+BS = 16
+
 # added for use with enc_fs
 def padding_length(plaintext_length):
     return BS - plaintext_length % BS
 
-BS = 16
-pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS) 
+pad = lambda s: s + (padding_length(len(s))) * chr(padding_length(len(s))) 
 unpad = lambda s : s[0:-ord(s[-1])]
 
 def make_key(password): # makes a 256-bit key, a 128-bit iv and a 64-bit password salt
