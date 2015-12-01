@@ -180,9 +180,12 @@ class Passthrough(Operations):
             return os.read(fh, length)
 
         os.lseek(fh, 0, os.SEEK_SET)
-        readlength = (offset + length) + (offset + length) % blocklength #what if offest = 0. length = 0?
-        data = os.read(fh, readlength)
 
+        readlength = offset + length
+        if readlength % blocklength != 0:
+            readlength = readlength + blocklength - readlength % blocklength
+
+        data = os.read(fh, readlength)
         if len(data) > 0:
             data = self.decrypt_with_metadata(path, data)
         return data[offset:(offset + length)]
