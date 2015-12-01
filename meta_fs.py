@@ -167,11 +167,13 @@ class MetaFs(Operations):
     # Write dict of metedata
     def write_meta_file(self, partial, metadata):
         meta_file = self._metadata_file(partial)
-        pickle.dump( metadata, open( meta_file, "wb" ) )
+        with open(meta_file, "wb") as f:
+            pickle.dump( metadata, f )
 
     def read_meta_file(self, partial):
         meta_file = self._metadata_file(partial)
-        meta_d = pickle.load( open( meta_file, "rb" ) )
+        with open(meta_file, "rb") as f:
+            meta_d = pickle.load(f)
         return meta_d
 
     def _metadata_filename(self, path):

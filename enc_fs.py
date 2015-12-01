@@ -85,14 +85,13 @@ class EncFs(MetaFs):
         #currently does not support writing less than the entire file
         plaintext = buf
         try:
-            f = open(path, 'r')
-            data = f.read()
+            with open(path, 'r') as f:
+                data = f.read()
 
-            #prevent useless metadata files. should clean them on deletes / truncates
-            if len(data) > 0:
-                data = self.decrypt_with_metadata(path, data)
-                plaintext = data[:offset] + buf + data[(offset + len(buf)):]
-            f.close()
+                #prevent useless metadata files. should clean them on deletes / truncates
+                if len(data) > 0:
+                    data = self.decrypt_with_metadata(path, data)
+                    plaintext = data[:offset] + buf + data[(offset + len(buf)):]
         except IOError:
             plaintext = buf
         
