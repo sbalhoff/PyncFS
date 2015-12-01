@@ -2,22 +2,12 @@
 
 # from __future__ import with_statement
 from fuse import FUSE, FuseOSError, Operations
-# import os
-import sys
-# import errno
-# import pickle
-# import hashlib
-
-#from encryption_provider import BasicEncryption
-from meta_fs import MetaFs
 from encryptionstore import retrieve_key
 from encryption import encrypt, decrypt, padding_length
 import os
+import sys
 
-
-
-
-
+from meta_fs import MetaFs
 
 class EncFs(MetaFs):
     enc_keymatter_file = '.enc_keymatter'
