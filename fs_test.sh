@@ -61,7 +61,7 @@ echo "success" > $test_dir/write_test
 check_success
 
 echo "write offset"
-dd if=/dev/zero of=$test_dir/offset_test seek=1000 count=2000 1>/dev/null 2>1
+dd if=/dev/zero of=$test_dir/offset_test seek=1000 count=2000 1>/dev/null 2>&1
 check_success
 
 echo "read"
@@ -70,7 +70,7 @@ check_success
 
 echo "read offset"
 yes | head -n 1000 > $test_dir/big
-dd if=$test_dir/big of=$test_dir/big_offset seek=1000 1>/dev/null 2>1
+dd if=$test_dir/big of=$test_dir/big_offset seek=1000 1>/dev/null 2>&1
 check_success
 
 echo "symlink"
