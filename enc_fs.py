@@ -158,7 +158,7 @@ class Passthrough(Operations):
         if partial.startswith("/"):
             partial = partial[1:]
         
-        return partial == enc_keymatter_file or partial == sign_keymatter_file or partial.startswith('metadata')
+        return partial == enc_keymatter_file or partial == sign_keymatter_file or partial.split('/')[0] == 'metadata'
 
     def open(self, path, flags):
         full_path = self._full_path(path)
