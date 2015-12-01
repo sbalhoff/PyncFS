@@ -2,9 +2,6 @@
 
 from __future__ import with_statement
 
-import sys
-sys.path.append('../dcc')
-
 from encryptionstore import retrieve_key
 from encryption import encrypt, decrypt, padding_length
 

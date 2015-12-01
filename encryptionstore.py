@@ -1,7 +1,4 @@
-﻿import sys
-sys.path.append('../dcc')
-
-from encryption import make_key, get_key
+﻿from encryption import make_key, get_key
 
 import os
 
