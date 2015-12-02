@@ -54,21 +54,27 @@ class BlockCipher():
         return data[offset:(offset + length)]
 
     def write_file(self, path, buf, offset, metadata):
+        print(metadata)
         #compute the entire plaintext to be written to the file
         #currently does not support writing less than the entire file
         plaintext = buf
         try:
             with open(path, 'r') as f:
                 data = f.read()
+                #print_bytes(data)
                 #prevent useless metadata files. should clean them on deletes / truncates
                 if len(data) > 0:
                     # Skipped data is 0 so don't decrypt
-                    if not is_all_zero(data) and offset != 0:
+                    if not is_all_zero(data) and offset != 0 and is_empty_meta(metadata):
+                        print("skip decrypt on seek")
                         data = self.decrypt_data(data, metadata)
+
                     plaintext = data[:offset] + buf + data[(offset + len(buf)):]
 
         except IOError:
             plaintext = buf
+
+        #print_bytes(plaintext)
         
         #encrypt and write the metadata file
         enc_block = self.encrypt_data(plaintext)

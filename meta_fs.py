@@ -112,6 +112,7 @@ class MetaFs(Operations):
         return self.is_metadata_file(partial)
 
     def open(self, path, flags):
+        print('open ' + path)
         full_path = self._full_path(path)
         return os.open(full_path, flags)
 
@@ -139,8 +140,9 @@ class MetaFs(Operations):
         return os.write(fh, buf)
 
     def truncate(self, path, length, fh=None):
+        print('truncate ' + path)
         full_path = self._full_path(path)
-        with open(full_path, 'r+') as f:
+        with open(full_path, 'w') as f:
             f.truncate(length)
 
     def flush(self, path, fh):
@@ -170,7 +172,7 @@ class MetaFs(Operations):
         with open(meta_file, "wb") as f:
             pickle.dump( metadata, f )
 
-    def read_meta_file(self, partial):
+    def read_metadata_file(self, partial):
         meta_file = self._metadata_file(partial)
         with open(meta_file, "rb") as f:
             meta_d = pickle.load(f)

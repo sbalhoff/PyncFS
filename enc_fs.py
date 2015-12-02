@@ -20,10 +20,14 @@ class EncFs(MetaFs):
         enc_pass = ''
         sign_pass = ''
 
-    def set_empty_meta(self, path):
+    def set_empty_meta(self, path, clear_meta=False):
         m_data = {
             'empty': True
         }
+
+        if not clear_meta:
+            m_data = merge_dict(m_data, self.read_metadata_file(path))
+
         self.write_metadata_file(path, m_data)
 
     def is_key_file(self, partial):
@@ -45,13 +49,13 @@ class EncFs(MetaFs):
 
     def truncate(self, path, length, fh=None):
         super(EncFs, self).truncate(path, length, fh)
-        self.set_empty_meta(path)
+        self.set_empty_meta(path, True)
 
     def read(self, path, length, offset, fh):
         if self.is_blacklisted_file(path):
             raise IOError()
 
-        metadata = self.read_meta_file(path)
+        metadata = self.read_metadata_file(path)
         return self.cipher.read_file(path, length, offset, fh, metadata)
 
     def write(self, path, buf, offset, fh):
@@ -60,7 +64,7 @@ class EncFs(MetaFs):
 
         print("write %s len: %s offset: %s" % (path, len(buf), offset))
 
-        old_metadata = self.read_meta_file(path)
+        old_metadata = self.read_metadata_file(path)
         res = self.cipher.write_file(self._full_path(path), buf, offset, old_metadata)
         new_meta = res[1]
         self.write_metadata_file(path, new_meta)
