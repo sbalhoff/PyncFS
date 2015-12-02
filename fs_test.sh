@@ -22,6 +22,10 @@ function check_success
 	fi
 	echo ""
 }
+function make_small
+{
+	yes | head -n 1000 > $test_dir/small
+}
 
 test_dir=$1/test_dir
 rm -rf $test_dir
@@ -69,8 +73,8 @@ cat $test_dir/write_test > /dev/null
 check_success
 
 echo "read offset"
-yes | head -n 1000 > $test_dir/big
-dd if=$test_dir/big of=$test_dir/big_offset seek=1000 1>/dev/null 2>&1
+make_small
+dd if=$test_dir/small of=$test_dir/big_offset seek=1000 1>/dev/null 2>&1
 check_success
 
 echo "symlink"
@@ -80,6 +84,10 @@ ln -s link_src link_dest
 check_success
 popd >/dev/null
 
+echo "truncate"
+make_small
+truncate -s 0 $test_dir/small
+check_success
 
 
 

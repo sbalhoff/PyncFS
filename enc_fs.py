@@ -37,6 +37,12 @@ class EncFs(MetaFs):
         }
         self.write_metadata_file(path, m_data)
 
+    def set_empty_meta(self, path):
+        m_data = {
+            'empty': True
+        }
+        self.write_metadata_file(path, m_data)
+
     def is_key_file(self, partial):
         partial = self._without_leading_slash(partial)
         return partial == self.enc_keymatter_file or partial == self.sign_keymatter_file
@@ -44,11 +50,21 @@ class EncFs(MetaFs):
     def is_blacklisted_file(self, partial):
         return self.is_key_file(partial) or super(EncFs, self).is_blacklisted_file(partial)
 
+
+
+    # ============
+    # File methods
+    # ============
+
     def create(self, path, mode, fi=None):
         f = super(EncFs, self).create(path, mode, fi)
         # Write meta here for consistency
-        self.write_metadata_file(path, { 'p': 'np'})
+        self.set_empty_meta(path)
         return f
+
+    def truncate(self, path, length, fh=None):
+        super(EncFs, self).truncate(path, length, fh)
+        self.set_empty_meta(path)
 
     #blocklength needs to be moved out of this function
     #do not need to read from offset 0 either
