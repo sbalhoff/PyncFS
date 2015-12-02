@@ -21,6 +21,8 @@ class EncFs(MetaFs):
         self.digest_size = 64
         self.iv_size = 16
 
+        self.cypher = PyBlockCypher(self.encryption_key, self.signing_key)
+
         #todo: securely delete passwords
         enc_pass = ''
         sign_pass = ''
@@ -84,18 +86,8 @@ class EncFs(MetaFs):
         if self.is_blacklisted_file(path):
             raise IOError()
 
-        blocklength = 16 #fix this
-
-        os.lseek(fh, 0, os.SEEK_SET)
-
-        readlength = offset + length
-        if readlength % blocklength != 0:
-            readlength = readlength + blocklength - readlength % blocklength
-
-        data = os.read(fh, readlength)
-        if len(data) > 0:
-            data = self.decrypt_with_metadata(path, data)
-        return data[offset:(offset + length)]
+        metadata = self.read_meta_file(path)
+        return self.cypher.read_file(path, length, offset, fh, metadata)
 
     def write(self, path, buf, offset, fh):
         if self.is_blacklisted_file(path):
@@ -121,12 +113,69 @@ class EncFs(MetaFs):
             plaintext = buf
         
         #encrypt and write the metadata file
-        filedata = encrypt(plaintext, self.encryption_key, self.signing_key)
-        padlength = padding_length(len(plaintext))
-        self.write_enc_metadata(path, filedata, padlength)
+        # filedata = encrypt(plaintext, self.encryption_key, self.signing_key)
+        # padlength = padding_length(len(plaintext))
+        # self.write_enc_metadata(path, filedata, padlength)
+        enc_block = self.cypher.encrypt_block(plaintext)
+        enc_data = enc_block[0]
+        metadata = enc_block[1]
+
+        # Save meta
+        self.write_metadata_file(path, metadata)
 
         #write the actual file. The first 80 bytes of filedata are the 
         #hex digest + the iv. The last "padlength" bytes are block padding
         os.lseek(fh, 0, os.SEEK_SET)
-        bytes_written = os.write(fh, filedata[self.metadata_header_length:(-1*padlength)])
+        bytes_written = os.write(fh, enc_data[self.metadata_header_length:(-1*metadata['pad_len'])])
         return min(len(buf), bytes_written)
+
+class PyBlockCypher():
+    group_block_multiple = 10
+    block_size = 16
+    digest_size = 64
+    iv_size = 16
+
+    def __init__(self, enc_key, sign_key):
+        self.group_block_size = self.block_size * self.group_block_multiple
+
+        self.encryption_key = enc_key
+        self.signing_key = sign_key
+
+    # Returns tuple of (encrypted_data, metadata)
+    def encrypt_block(self, data):
+        enc_data = encrypt(data, self.encryption_key, self.signing_key)
+        meta = self.get_block_metadata(data, enc_data)
+        return (enc_data, meta)
+
+    def get_block_metadata(self, plain_data, enc_data):
+        padlength = padding_length(len(plain_data))
+        digest = enc_data[0:self.digest_size]
+        iv = enc_data[self.digest_size:self.digest_size+self.iv_size]
+        m_data = {
+            'digest': digest,
+            'iv': iv,
+            'padding': enc_data[(-1 * padlength):],
+            'pad_len': padlength
+        }
+        return m_data
+
+    def decrypt_with_metadata(self, data, metadata):
+        data = metadata['digest'] + metadata['iv'] + data + metadata['padding']
+        return decrypt(data, self.encryption_key, self.signing_key)
+
+    def read_file(self, path, length, offset, fh, metadata):
+        print("read "+ path)
+        os.lseek(fh, 0, os.SEEK_SET)
+
+        readlength = offset + length
+        if readlength % self.block_size != 0:
+            readlength = readlength + self.block_size - readlength % self.block_size
+
+        data = os.read(fh, readlength)
+        if len(data) > 0:
+            data = self.decrypt_with_metadata(data, metadata)
+
+        return data[offset:(offset + length)]
+
+    def write_file(self, path, length, offset, metadata):
+        print("write")
