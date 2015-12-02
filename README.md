@@ -7,5 +7,5 @@ pip3 install fusepy pbkdf2
 
 ### Running
 
-./launcher.py rootdir mountdir encryptionpassword signingpassword
+./pyncfs.py rootdir mountdir encryptionpassword signingpassword
 
