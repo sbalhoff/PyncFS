@@ -101,7 +101,7 @@ class EncFs(MetaFs):
         if self.is_blacklisted_file(path):
             raise IOError
 
-        print("write len: %s offset: %s to: %s" % (len(buf), offset, path))
+        print("write %s len: %s offset: %s" % (path, len(buf), offset))
         #self._print_bytes(buf)
 
         #compute the entire plaintext to be written to the file
@@ -113,7 +113,7 @@ class EncFs(MetaFs):
                 #prevent useless metadata files. should clean them on deletes / truncates
                 if len(data) > 0:
                     # Skipped data is 0 so don't decrypt
-                    if not self._is_all_zero(data):
+                    if not self._is_all_zero(data) and offset != 0:
                         data = self.decrypt_with_metadata(path, data)
                     plaintext = data[:offset] + buf + data[(offset + len(buf)):]
 
