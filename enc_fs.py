@@ -30,12 +30,12 @@ class EncFs(MetaFs):
         return decrypt(data, self.encryption_key, self.signing_key)
 
     #enc_data format: 64 byte digest, 16 byte iv, actual encrypted data, padding on the end
-    def write_metadata_file(self, path, enc_data, padlength):
+    def write_enc_metadata(self, path, enc_data, padlength):
         m_data = {
             'header': enc_data[0:self.metadata_header_length],
             'padding': enc_data[(-1 * padlength):]
         }
-        self.write_meta_file(path, m_data)
+        self.write_metadata_file(path, m_data)
 
     def is_key_file(self, partial):
         partial = self._without_leading_slash(partial)
@@ -43,6 +43,12 @@ class EncFs(MetaFs):
 
     def is_blacklisted_file(self, partial):
         return self.is_key_file(partial) or super(EncFs, self).is_blacklisted_file(partial)
+
+    def create(self, path, mode, fi=None):
+        f = super(EncFs, self).create(path, mode, fi)
+        # Write meta here for consistency
+        self.write_metadata_file(path, { 'p': 'np'})
+        return f
 
     #blocklength needs to be moved out of this function
     #do not need to read from offset 0 either
@@ -85,7 +91,7 @@ class EncFs(MetaFs):
         #encrypt and write the metadata file
         filedata = encrypt(plaintext, self.encryption_key, self.signing_key)
         padlength = padding_length(len(plaintext))
-        self.write_metadata_file(path, filedata, padlength)
+        self.write_enc_metadata(path, filedata, padlength)
 
         #write the actual file. The first 80 bytes of filedata are the 
         #hex digest + the iv. The last "padlength" bytes are block padding

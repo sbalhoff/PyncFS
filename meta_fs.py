@@ -165,7 +165,7 @@ class MetaFs(Operations):
         return partial.split('/')[0] == 'metadata'
 
     # Write dict of metedata
-    def write_meta_file(self, partial, metadata):
+    def write_metadata_file(self, partial, metadata):
         meta_file = self._metadata_file(partial)
         with open(meta_file, "wb") as f:
             pickle.dump( metadata, f )
