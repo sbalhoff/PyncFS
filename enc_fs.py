@@ -21,23 +21,6 @@ class EncFs(MetaFs):
         enc_pass = ''
         sign_pass = ''
 
-    def decrypt_with_metadata(self, path, data):
-        print('decrypt path: ' + path)
-        metadata = self.read_meta_file(path)
-        data = metadata['digest'] + metadata['iv'] + data + metadata['padding']
-        return decrypt(data, self.encryption_key, self.signing_key)
-
-    #enc_data format: 64 byte digest, 16 byte iv, actual encrypted data, padding on the end
-    def write_enc_metadata(self, path, enc_data, padlength):
-        digest = enc_data[0:self.digest_size]
-        iv = enc_data[self.digest_size:self.digest_size+self.iv_size]
-        m_data = {
-            'digest': digest,
-            'iv': iv,
-            'padding': enc_data[(-1 * padlength):]
-        }
-        self.write_metadata_file(path, m_data)
-
     def set_empty_meta(self, path):
         m_data = {
             'empty': True
@@ -65,9 +48,6 @@ class EncFs(MetaFs):
         super(EncFs, self).truncate(path, length, fh)
         self.set_empty_meta(path)
 
-    #blocklength needs to be moved out of this function
-    #do not need to read from offset 0 either
-    #also need to check whether to append the metadata
     def read(self, path, length, offset, fh):
         if self.is_blacklisted_file(path):
             raise IOError()
@@ -85,8 +65,8 @@ class EncFs(MetaFs):
         res = self.cypher.write_file(self._full_path(path), buf, offset, old_metadata)
         new_meta = res[1]
         self.write_metadata_file(path, new_meta)
-
-        return res[0]
+        num_written = res[0]
+        return num_written
 
 
 class BlockCypher():
