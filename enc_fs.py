@@ -47,6 +47,7 @@ class EncFs(MetaFs):
 
         with self.with_meta_obj(path) as o:
             o.set_length(length)
+            o['truncated'] = True
 
             #if length == 0:
             #    o.set_empty(True)
@@ -65,13 +66,27 @@ class EncFs(MetaFs):
 
         print("write %s len: %s offset: %s" % (path, len(buf), offset))
 
-        old_metadata = self.get_meta_obj(path)
-        res = self.cipher.write_file(self._full_path(path), buf, offset, old_metadata)
+        metadata = self.get_meta_obj(path)
+        res = self.cipher.write_file(self._full_path(path), buf, offset, metadata)
+        self.update_meta_on_write(metadata, res)
+        num_written = res[0]
+        return num_written
+
+    def update_meta_on_write(self, metadata, res):
         new_meta = res[1]
         num_written = res[0]
 
-        if num_written > 0:
-            new_meta['empty'] = False
-        self.save_meta_obj(new_meta)
+        # Clear truncation after write
+        if 'truncated' in metadata:
+            metadata['truncated'] = False
 
-        return num_written
+        # Update len
+        metadata.set_length(new_meta['length'])
+        metadata.update(new_meta)
+
+        # Check empty
+        if num_written > 0:
+            metadata['empty'] = False
+
+        # Save
+        self.save_meta_obj(metadata)

@@ -57,7 +57,7 @@ class BlockCipher():
         return data[offset:(offset + length)]
 
     def write_file(self, path, buf, offset, metadata):
-        #print(metadata)
+        print(metadata)
         #compute the entire plaintext to be written to the file
         #currently does not support writing less than the entire file
         plaintext = buf
@@ -71,7 +71,7 @@ class BlockCipher():
                     print("Load previous data len: %s " % len(data))
 
                     # Check for seek ahead
-                    if offset > old_len + self.block_size and old_len < offset:
+                    if  offset > old_len + buf_len and metadata['truncated']:
                         #print_bytes(data)
                         print("Seeking ahead - prev: %s offset: %s len: %s" % (old_len, offset, buf_len))
                         
@@ -87,6 +87,7 @@ class BlockCipher():
                             data = prev_data + data[old_len:offset]
                     else:
                         # Decrypt all data
+                        print("Decrypt all data")
                         data = self.decrypt_data(data, metadata)
 
                 #print_bytes(data)
@@ -101,12 +102,10 @@ class BlockCipher():
         enc_block = self.encrypt_data(plaintext)
         enc_data = enc_block[0]
         new_meta = enc_block[1]
-        metadata.set_length(new_meta['length'])
-        metadata.update(new_meta)
 
         #write the actual file. The first 80 bytes of filedata are the 
         #hex digest + the iv. The last "padlength" bytes are block padding
-        write_data = enc_data[self.metadata_header_length:(-1*metadata['pad_len'])]
+        write_data = enc_data[self.metadata_header_length:(-1*new_meta['pad_len'])]
         with open(path, 'wb') as f:
             f.write(write_data)
 
@@ -114,4 +113,4 @@ class BlockCipher():
         sze = min(len(buf), bytes_written)
 
         #print(metadata)
-        return (sze, metadata)
+        return (sze, new_meta)
