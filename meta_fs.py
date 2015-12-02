@@ -1,10 +1,13 @@
 from __future__ import with_statement
 from fuse import FUSE, FuseOSError, Operations
+from contextlib import contextmanager
 import os
 import sys
 import errno
 import pickle
 import hashlib
+
+from file_metadata import FileMetaData
 
 class MetaFs(Operations):
     def __init__(self, root, opts):
@@ -140,9 +143,9 @@ class MetaFs(Operations):
         return os.write(fh, buf)
 
     def truncate(self, path, length, fh=None):
-        print('truncate ' + path)
+        print('truncate %s to len: %s' % (path, length))
         full_path = self._full_path(path)
-        with open(full_path, 'w') as f:
+        with open(full_path, 'r+') as f:
             f.truncate(length)
 
     def flush(self, path, fh):
@@ -161,6 +164,25 @@ class MetaFs(Operations):
     # =========
     # Metadata
     # =========
+
+    def get_meta_obj(self, path):
+        try:
+            current = self.read_metadata_file(path)
+        except IOError as e:
+            print("Creating metatdat for " + path)
+            current = { 'path': path }
+
+        return FileMetaData(current)
+
+    def save_meta_obj(self, obj):
+        print("saving meta obj for " + obj.path)
+        self.write_metadata_file(obj.path, obj.data)
+
+    @contextmanager
+    def with_meta_obj(self, path):
+        obj = self.get_meta_obj(path)
+        yield obj
+        self.save_meta_obj(obj)
 
     def is_metadata_file(self, partial):
     	partial = self._without_leading_slash(partial)

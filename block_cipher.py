@@ -23,15 +23,16 @@ class BlockCipher():
         meta = self.get_metadata(data, enc_data)
         return (enc_data, meta)
 
-    def get_metadata(self, plain_data, enc_data):
-        padlength = padding_length(len(plain_data))
+    def get_metadata(self, plaintext, enc_data):
+        padlength = padding_length(len(plaintext))
         digest = enc_data[0:self.digest_size]
         iv = enc_data[self.digest_size:self.digest_size+self.iv_size]
         m_data = {
             'digest': digest,
             'iv': iv,
             'padding': enc_data[(-1 * padlength):],
-            'pad_len': padlength
+            'pad_len': padlength,
+            'length': len(bytes(plaintext))
         }
         return m_data
 
@@ -50,26 +51,46 @@ class BlockCipher():
         data = os.read(fh, readlength)
         if len(data) > 0:
             data = self.decrypt_data(data, metadata)
+        else:
+            print("no data read")
 
         return data[offset:(offset + length)]
 
     def write_file(self, path, buf, offset, metadata):
-        print(metadata)
+        #print(metadata)
         #compute the entire plaintext to be written to the file
         #currently does not support writing less than the entire file
         plaintext = buf
+        buf_len = len(buf)
+        data_len = metadata['length']
+        old_len = metadata['old_length']
         try:
             with open(path, 'r') as f:
                 data = f.read()
-                #print_bytes(data)
-                #prevent useless metadata files. should clean them on deletes / truncates
                 if len(data) > 0:
-                    # Skipped data is 0 so don't decrypt
-                    if not is_all_zero(data) and offset != 0 and is_empty_meta(metadata):
-                        print("skip decrypt on seek")
+                    print("Load previous data len: %s " % len(data))
+
+                    # Check for seek ahead
+                    if offset > old_len + self.block_size and old_len < offset:
+                        #print_bytes(data)
+                        print("Seeking ahead - prev: %s offset: %s len: %s" % (old_len, offset, buf_len))
+                        
+                        if is_all_zero(data): #is_empty_meta(metadata)
+                            print("skip decrypt on empty seek")
+                        else:
+                            # Decrypt partial data if needed
+                            prev_enc_data = data[0:old_len]
+                            prev_data = self.decrypt_data(prev_enc_data, metadata)
+                            #print_bytes(prev_enc_data)
+                            #print_bytes(prev_data)
+
+                            data = prev_data + data[old_len:offset]
+                    else:
+                        # Decrypt all data
                         data = self.decrypt_data(data, metadata)
 
-                    plaintext = data[:offset] + buf + data[(offset + len(buf)):]
+                #print_bytes(data)
+                plaintext = data[:offset] + buf + data[(offset + len(buf)):]
 
         except IOError:
             plaintext = buf
@@ -79,7 +100,9 @@ class BlockCipher():
         #encrypt and write the metadata file
         enc_block = self.encrypt_data(plaintext)
         enc_data = enc_block[0]
-        metadata = enc_block[1]
+        new_meta = enc_block[1]
+        metadata.set_length(new_meta['length'])
+        metadata.update(new_meta)
 
         #write the actual file. The first 80 bytes of filedata are the 
         #hex digest + the iv. The last "padlength" bytes are block padding
@@ -90,4 +113,5 @@ class BlockCipher():
         bytes_written = len(write_data)
         sze = min(len(buf), bytes_written)
 
+        #print(metadata)
         return (sze, metadata)

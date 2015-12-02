@@ -5,6 +5,7 @@ def is_empty_meta(metadata):
     empty = False
     if 'empty' in metadata:
         empty = metadata['empty']
+    print("empty: %s" % empty)
     return empty
 
 # Misc
@@ -21,3 +22,4 @@ def merge_dict(a, b):
 
 def print_bytes(data):
     print(' '.join(format(x, '02x') for x in bytearray(data)))
+
