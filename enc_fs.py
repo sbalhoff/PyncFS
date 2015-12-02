@@ -5,6 +5,7 @@ from encryption import encrypt, decrypt, padding_length
 import os
 
 from meta_fs import MetaFs
+from util import *
 
 class EncFs(MetaFs):
     enc_keymatter_file = '.enc_keymatter'
@@ -12,16 +13,9 @@ class EncFs(MetaFs):
     
     def __init__(self, root, opts):
         MetaFs.__init__(self, root, opts)
-        enc_pass = opts['enc_pass']
-        sign_pass = opts['sign_pass']
-
-        self.encryption_key = retrieve_key(enc_pass, self._full_path(self.enc_keymatter_file))
-        self.signing_key = retrieve_key(sign_pass, self._full_path(self.sign_keymatter_file))
-        self.metadata_header_length = 80
-        self.digest_size = 64
-        self.iv_size = 16
-
-        self.cypher = PyBlockCypher(self.encryption_key, self.signing_key)
+        self.encryption_key = retrieve_key(opts['enc_pass'], self._full_path(self.enc_keymatter_file))
+        self.signing_key = retrieve_key(opts['sign_pass'], self._full_path(self.sign_keymatter_file))
+        self.cypher = BlockCypher(self.encryption_key, self.signing_key)
 
         #todo: securely delete passwords
         enc_pass = ''
@@ -57,14 +51,6 @@ class EncFs(MetaFs):
     def is_blacklisted_file(self, partial):
         return self.is_key_file(partial) or super(EncFs, self).is_blacklisted_file(partial)
 
-    def _is_all_zero(self, data):
-        z_map = map(lambda a: a == chr(0), data)
-        r = reduce(lambda a,b: a & b, z_map)
-        return r
-
-    def _print_bytes(self, data):
-        print(' '.join(format(x, '02x') for x in bytearray(data)))
-
     # ============
     # File methods
     # ============
@@ -94,44 +80,20 @@ class EncFs(MetaFs):
             raise IOError
 
         print("write %s len: %s offset: %s" % (path, len(buf), offset))
-        #self._print_bytes(buf)
 
-        #compute the entire plaintext to be written to the file
-        #currently does not support writing less than the entire file
-        plaintext = buf
-        try:
-            with open(self._full_path(path), 'r') as f:
-                data = f.read()
-                #prevent useless metadata files. should clean them on deletes / truncates
-                if len(data) > 0:
-                    # Skipped data is 0 so don't decrypt
-                    if not self._is_all_zero(data) and offset != 0:
-                        data = self.decrypt_with_metadata(path, data)
-                    plaintext = data[:offset] + buf + data[(offset + len(buf)):]
+        old_metadata = self.read_meta_file(path)
+        res = self.cypher.write_file(self._full_path(path), buf, offset, old_metadata)
+        new_meta = res[1]
+        self.write_metadata_file(path, new_meta)
 
-        except IOError:
-            plaintext = buf
-        
-        #encrypt and write the metadata file
-        # filedata = encrypt(plaintext, self.encryption_key, self.signing_key)
-        # padlength = padding_length(len(plaintext))
-        # self.write_enc_metadata(path, filedata, padlength)
-        enc_block = self.cypher.encrypt_block(plaintext)
-        enc_data = enc_block[0]
-        metadata = enc_block[1]
+        return res[0]
 
-        # Save meta
-        self.write_metadata_file(path, metadata)
 
-        #write the actual file. The first 80 bytes of filedata are the 
-        #hex digest + the iv. The last "padlength" bytes are block padding
-        os.lseek(fh, 0, os.SEEK_SET)
-        bytes_written = os.write(fh, enc_data[self.metadata_header_length:(-1*metadata['pad_len'])])
-        return min(len(buf), bytes_written)
-
-class PyBlockCypher():
+class BlockCypher():
     group_block_multiple = 10
     block_size = 16
+
+    metadata_header_length = 80
     digest_size = 64
     iv_size = 16
 
@@ -177,5 +139,35 @@ class PyBlockCypher():
 
         return data[offset:(offset + length)]
 
-    def write_file(self, path, length, offset, metadata):
-        print("write")
+    def write_file(self, path, buf, offset, metadata):
+        #compute the entire plaintext to be written to the file
+        #currently does not support writing less than the entire file
+        plaintext = buf
+        try:
+            with open(path, 'r') as f:
+                data = f.read()
+                #prevent useless metadata files. should clean them on deletes / truncates
+                if len(data) > 0:
+                    # Skipped data is 0 so don't decrypt
+                    if not is_all_zero(data) and offset != 0:
+                        data = self.decrypt_with_metadata(data, metadata)
+                    plaintext = data[:offset] + buf + data[(offset + len(buf)):]
+
+        except IOError:
+            plaintext = buf
+        
+        #encrypt and write the metadata file
+        enc_block = self.encrypt_block(plaintext)
+        enc_data = enc_block[0]
+        metadata = enc_block[1]
+
+        #write the actual file. The first 80 bytes of filedata are the 
+        #hex digest + the iv. The last "padlength" bytes are block padding
+        write_data = enc_data[self.metadata_header_length:(-1*metadata['pad_len'])]
+        with open(path, 'wb') as f:
+            f.write(write_data)
+
+        bytes_written = len(write_data)
+        sze = min(len(buf), bytes_written)
+
+        return (sze, metadata)
