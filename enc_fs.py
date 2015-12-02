@@ -99,7 +99,7 @@ class EncFs(MetaFs):
         #currently does not support writing less than the entire file
         plaintext = buf
         try:
-            with open(path, 'r') as f:
+            with open(self._full_path(path), 'r') as f:
                 data = f.read()
 
                 #prevent useless metadata files. should clean them on deletes / truncates
