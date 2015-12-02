@@ -18,6 +18,8 @@ class EncFs(MetaFs):
         self.encryption_key = retrieve_key(enc_pass, self._full_path(self.enc_keymatter_file))
         self.signing_key = retrieve_key(sign_pass, self._full_path(self.sign_keymatter_file))
         self.metadata_header_length = 80
+        self.digest_size = 64
+        self.iv_size = 16
 
         #todo: securely delete passwords
         enc_pass = ''
@@ -26,13 +28,16 @@ class EncFs(MetaFs):
     def decrypt_with_metadata(self, path, data):
         print('decrypt path: ' + path)
         metadata = self.read_meta_file(path)
-        data = metadata['header'] + data + metadata['padding']
+        data = metadata['digest'] + metadata['iv'] + data + metadata['padding']
         return decrypt(data, self.encryption_key, self.signing_key)
 
     #enc_data format: 64 byte digest, 16 byte iv, actual encrypted data, padding on the end
     def write_enc_metadata(self, path, enc_data, padlength):
+        digest = enc_data[0:self.digest_size]
+        iv = enc_data[self.digest_size:self.digest_size+self.iv_size]
         m_data = {
-            'header': enc_data[0:self.metadata_header_length],
+            'digest': digest,
+            'iv': iv,
             'padding': enc_data[(-1 * padlength):]
         }
         self.write_metadata_file(path, m_data)
