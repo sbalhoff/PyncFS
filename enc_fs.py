@@ -1,11 +1,8 @@
-#!/usr/bin/env python
-
-# from __future__ import with_statement
+from __future__ import with_statement
 from fuse import FUSE, FuseOSError, Operations
 from encryptionstore import retrieve_key
 from encryption import encrypt, decrypt, padding_length
 import os
-import sys
 
 from meta_fs import MetaFs
 
@@ -95,22 +92,3 @@ class EncFs(MetaFs):
         os.lseek(fh, 0, os.SEEK_SET)
         bytes_written = os.write(fh, filedata[self.metadata_header_length:(-1*padlength)])
         return min(len(buf), bytes_written)
-
-
-
-def main(mountpoint, root, encryption_password_in, signing_password_in):
-    opts = {
-        'enc_pass': encryption_password_in,
-        'sign_pass': signing_password_in
-    }
-    FUSE(EncFs(root, opts), mountpoint, nothreads=True, foreground=True)
-
-def print_usage():
-    print("Usage: enc_fs.py rootdir mountdir encryptionpassword signingpassword")
-
-if __name__ == '__main__':
-    if len(sys.argv) < 5:
-        print_usage()
-        exit()
-
-    main(sys.argv[2], sys.argv[1], sys.argv[3], sys.argv[4])
