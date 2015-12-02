@@ -12,10 +12,17 @@ from file_metadata import FileMetaData
 class MetaFs(Operations):
     def __init__(self, root, opts):
         self.root = root
+        self.opts = opts
 
     # =======    
     # Helpers
     # =======
+
+    def _mounted_path(self, partial):
+        if partial.startswith("/"):
+            partial = partial[1:]
+        path = os.path.join(self.opts['mount_dir'], partial)
+        return path
 
     def _full_path(self, partial):
         if partial.startswith("/"):

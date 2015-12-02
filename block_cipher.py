@@ -1,5 +1,6 @@
 from encryption import encrypt, decrypt, padding_length
 import os
+import math
 
 from util import *
 
@@ -16,6 +17,9 @@ class BlockCipher():
 
         self.encryption_key = enc_key
         self.signing_key = sign_key
+
+    def get_nearest_block_size(self, size):
+        return int(self.block_size * math.ceil(size / float(self.block_size)))
 
     # Returns tuple of (encrypted_data, metadata)
     def encrypt_data(self, data):
@@ -71,24 +75,24 @@ class BlockCipher():
                     print("Load previous data len: %s " % len(data))
 
                     # Check for seek ahead
-                    if  offset > old_len + buf_len and metadata['truncated']:
-                        #print_bytes(data)
-                        print("Seeking ahead - prev: %s offset: %s len: %s" % (old_len, offset, buf_len))
+                    # if  offset > old_len + buf_len and metadata['truncated']:
+                    #     #print_bytes(data)
+                    #     print("Seeking ahead - prev: %s offset: %s len: %s" % (old_len, offset, buf_len))
                         
-                        if is_all_zero(data): #is_empty_meta(metadata)
-                            print("skip decrypt on empty seek")
-                        else:
-                            # Decrypt partial data if needed
-                            prev_enc_data = data[0:old_len]
-                            prev_data = self.decrypt_data(prev_enc_data, metadata)
-                            #print_bytes(prev_enc_data)
-                            #print_bytes(prev_data)
+                    #     if is_all_zero(data): #is_empty_meta(metadata)
+                    #         print("skip decrypt on empty seek")
+                    #     else:
+                    #         # Decrypt partial data if needed
+                    #         prev_enc_data = data[0:old_len]
+                    #         prev_data = self.decrypt_data(prev_enc_data, metadata)
+                    #         #print_bytes(prev_enc_data)
+                    #         #print_bytes(prev_data)
 
-                            data = prev_data + data[old_len:offset]
-                    else:
+                    #         data = prev_data + data[old_len:offset]
+                    # else:
                         # Decrypt all data
-                        print("Decrypt all data")
-                        data = self.decrypt_data(data, metadata)
+                    print("Decrypt all data")
+                    data = self.decrypt_data(data, metadata)
 
                 #print_bytes(data)
                 plaintext = data[:offset] + buf + data[(offset + len(buf)):]

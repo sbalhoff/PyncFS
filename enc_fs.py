@@ -1,6 +1,7 @@
 from __future__ import with_statement
 from fuse import FUSE, FuseOSError, Operations
 from encryptionstore import retrieve_key
+import os
 
 from meta_fs import MetaFs
 from file_metadata import FileMetaData
@@ -13,6 +14,7 @@ class EncFs(MetaFs):
 
     def __init__(self, root, opts):
         MetaFs.__init__(self, root, opts)
+        self.opts = opts
         self.encryption_key = retrieve_key(opts['enc_pass'], self._full_path(self.enc_keymatter_file))
         self.signing_key = retrieve_key(opts['sign_pass'], self._full_path(self.sign_keymatter_file))
         self.cipher = BlockCipher(self.encryption_key, self.signing_key)
@@ -43,7 +45,13 @@ class EncFs(MetaFs):
 
     # TODO finish metedata updates on truncate
     def truncate(self, path, length, fh=None):
-        super(EncFs, self).truncate(path, length, fh)
+        tmp_size = self.cipher.get_nearest_block_size(length)
+        print("truncating encrypted file on block bounds %s" % tmp_size)
+        
+
+        self.re_encrypt_file(path, length)
+
+        super(EncFs, self).truncate(path, tmp_size, fh)
 
         with self.with_meta_obj(path) as o:
             o.set_length(length)
@@ -68,13 +76,13 @@ class EncFs(MetaFs):
 
         metadata = self.get_meta_obj(path)
         res = self.cipher.write_file(self._full_path(path), buf, offset, metadata)
-        self.update_meta_on_write(metadata, res)
         num_written = res[0]
+        new_meta = res[1]
+        
+        self.update_meta_on_write(metadata, new_meta)
         return num_written
 
-    def update_meta_on_write(self, metadata, res):
-        new_meta = res[1]
-        num_written = res[0]
+    def update_meta_on_write(self, metadata, new_meta):
 
         # Clear truncation after write
         if 'truncated' in metadata:
@@ -85,8 +93,43 @@ class EncFs(MetaFs):
         metadata.update(new_meta)
 
         # Check empty
-        if num_written > 0:
+        if metadata['length'] > 0:
             metadata['empty'] = False
 
         # Save
         self.save_meta_obj(metadata)
+
+    def re_encrypt_file(self, path, length):
+        print("re encrypt %s to length %s" % (path, length))
+        metadata = self.get_meta_obj(path)
+        print(metadata)
+        #with os.open(self._full_path(path), os.O_RDONLY) as fh:
+        fh = os.open(self._full_path(path), os.O_RDWR)
+        os.lseek(fh, 0, os.SEEK_SET)
+        data = self.cipher.read_file(path, length, 0, fh, metadata)
+
+        # Trim to new length
+        new_data = data[:length]
+
+        # Pad with zero if needed
+        if metadata['length'] < length:
+            dif = length - metadata['length']
+            new_data += ''.join([chr(0)] * dif)
+
+        os.ftruncate(fh, 0)
+        os.lseek(fh, 0, os.SEEK_SET)
+
+        #Write new encrypted
+        enc_block_res = self.cipher.encrypt_data(new_data)
+        enc_data = enc_block_res[0]
+        new_meta = enc_block_res[1]
+
+        # Save back
+        write_data = enc_data[self.cipher.metadata_header_length:(-1*new_meta['pad_len'])]
+        os.write(fh, write_data)
+
+        os.close(fh)
+
+        self.update_meta_on_write(metadata, new_meta)
+        # print_bytes(new_data)
+        # print_bytes(write_data)

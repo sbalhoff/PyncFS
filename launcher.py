@@ -7,7 +7,8 @@ import sys
 def main(mountpoint, root, encryption_password_in, signing_password_in):
     opts = {
         'enc_pass': encryption_password_in,
-        'sign_pass': signing_password_in
+        'sign_pass': signing_password_in,
+        'mount_dir': mountpoint
     }
     FUSE(EncFs(root, opts), mountpoint, nothreads=True, foreground=True)
 
