@@ -3,7 +3,7 @@ from fuse import FUSE, FuseOSError, Operations
 from encryptionstore import retrieve_key
 
 from meta_fs import MetaFs
-from block_cypher import BlockCypher
+from block_cipher import BlockCipher
 from util import *
 
 class EncFs(MetaFs):
@@ -14,7 +14,7 @@ class EncFs(MetaFs):
         MetaFs.__init__(self, root, opts)
         self.encryption_key = retrieve_key(opts['enc_pass'], self._full_path(self.enc_keymatter_file))
         self.signing_key = retrieve_key(opts['sign_pass'], self._full_path(self.sign_keymatter_file))
-        self.cypher = BlockCypher(self.encryption_key, self.signing_key)
+        self.cipher = BlockCipher(self.encryption_key, self.signing_key)
 
         #todo: securely delete passwords
         enc_pass = ''
@@ -52,7 +52,7 @@ class EncFs(MetaFs):
             raise IOError()
 
         metadata = self.read_meta_file(path)
-        return self.cypher.read_file(path, length, offset, fh, metadata)
+        return self.cipher.read_file(path, length, offset, fh, metadata)
 
     def write(self, path, buf, offset, fh):
         if self.is_blacklisted_file(path):
@@ -61,7 +61,7 @@ class EncFs(MetaFs):
         print("write %s len: %s offset: %s" % (path, len(buf), offset))
 
         old_metadata = self.read_meta_file(path)
-        res = self.cypher.write_file(self._full_path(path), buf, offset, old_metadata)
+        res = self.cipher.write_file(self._full_path(path), buf, offset, old_metadata)
         new_meta = res[1]
         self.write_metadata_file(path, new_meta)
         num_written = res[0]

@@ -3,7 +3,7 @@ import os
 
 from util import *
 
-class BlockCypher():
+class BlockCipher():
     group_block_multiple = 10
     block_size = 16
 
