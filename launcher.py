@@ -12,7 +12,7 @@ def main(mountpoint, root, encryption_password_in, signing_password_in):
     FUSE(EncFs(root, opts), mountpoint, nothreads=True, foreground=True)
 
 def print_usage():
-    print("Usage: enc_fs.py rootdir mountdir encryptionpassword signingpassword")
+    print("Usage: launcher.py rootdir mountdir encryptionpassword signingpassword")
 
 if __name__ == '__main__':
     if len(sys.argv) < 5:
