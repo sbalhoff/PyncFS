@@ -55,7 +55,13 @@ class EncFs(MetaFs):
     def is_blacklisted_file(self, partial):
         return self.is_key_file(partial) or super(EncFs, self).is_blacklisted_file(partial)
 
+    def _is_all_zero(self, data):
+        z_map = map(lambda a: a == chr(0), data)
+        r = reduce(lambda a,b: a & b, z_map)
+        return r
 
+    def _print_bytes(self, data):
+        print(' '.join(format(x, '02x') for x in bytearray(data)))
 
     # ============
     # File methods
@@ -95,17 +101,22 @@ class EncFs(MetaFs):
         if self.is_blacklisted_file(path):
             raise IOError
 
+        print("write len: %s offset: %s to: %s" % (len(buf), offset, path))
+        #self._print_bytes(buf)
+
         #compute the entire plaintext to be written to the file
         #currently does not support writing less than the entire file
         plaintext = buf
         try:
             with open(self._full_path(path), 'r') as f:
                 data = f.read()
-
                 #prevent useless metadata files. should clean them on deletes / truncates
                 if len(data) > 0:
-                    data = self.decrypt_with_metadata(path, data)
+                    # Skipped data is 0 so don't decrypt
+                    if not self._is_all_zero(data):
+                        data = self.decrypt_with_metadata(path, data)
                     plaintext = data[:offset] + buf + data[(offset + len(buf)):]
+
         except IOError:
             plaintext = buf
         
