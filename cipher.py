@@ -33,9 +33,6 @@ from Crypto import Random
 #               if len(block) == cipher.blocksize:
 #                   plaintext = block xor text
 
-def printhex(bytestr):
-    print(':'.join(x.encode('hex') for x in bytestr))
-
 class BlockMode:
 
     MODE_ECB = 1
@@ -106,34 +103,23 @@ class Cipher:
     def generate_iv(self, block_size):
         return rand(block_size)
 
+    #we should switch to a streaming mode, ciphertext stealing, or residual block termination
     def encrypt(self, text):
-        if len(text) % self.encryption_function.block_size == 0:
-            return self.cipher.encrypt(text)
-        else:
-            paddedtext = pad(text)
-            return self.cipher.encrypt(paddedtext)
+        paddedtext = self.pad(text)
+        return self.cipher.encrypt(paddedtext)
 
+    #see the comment on encrypt()
     def decrypt(self, text):
         #could assert block size here
-        return unpad(self.cipher.decrypt(text))
+        return self.unpad(self.cipher.decrypt(text))
 
+    def get_pad_length(self, s):
+        return self.encryption_function.block_size - len(s) % self.encryption_function.block_size
 
-#more test vectors need to be written (can be found on the internet), but I don't have time at the moment
-#https://tools.ietf.org/html/rfc3602 has some test vectors.
+    def pad(self, s): 
+        pad_length = self.get_pad_length(s)
+        return s + (pad_length * chr(pad_length))
 
-key = '\x06\xa9\x21\x40\x36\xb8\xa1\x5b\x51\x2e\x03\xd5\x34\x12\x00\x06'
-iv = '\x3d\xaf\xba\x42\x9d\x9e\xb4\x30\xb4\x22\xda\x80\x2c\x9f\xac\x41'
-plaintext = 'Single block msg'
-expected_enc = '\xe3\x53\x77\x9c\x10\x79\xae\xb8\x27\x08\x94\x2d\xbe\x77\x18\x1a'
-
-c = Cipher(CipherType.AES_128(), BlockMode.MODE_CBC, key, iv)
-enc = c.encrypt(plaintext)
-
-assert expected_enc == enc[0:16]
-printhex(enc)
-
-
-
-
-
+    def unpad(self, s, blocksize):
+        return s[0:-ord(s[-1])]
 
