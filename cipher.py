@@ -119,6 +119,7 @@ class Cipher:
 
 
 #more test vectors need to be written (can be found on the internet), but I don't have time at the moment
+#https://tools.ietf.org/html/rfc3602 has some test vectors.
 
 key = '\x06\xa9\x21\x40\x36\xb8\xa1\x5b\x51\x2e\x03\xd5\x34\x12\x00\x06'
 iv = '\x3d\xaf\xba\x42\x9d\x9e\xb4\x30\xb4\x22\xda\x80\x2c\x9f\xac\x41'
