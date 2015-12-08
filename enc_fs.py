@@ -55,7 +55,6 @@ class EncFs(MetaFs):
 
         with self.with_meta_obj(path) as o:
             o.set_length(length)
-            o['truncated'] = True
 
             #if length == 0:
             #    o.set_empty(True)
@@ -82,11 +81,9 @@ class EncFs(MetaFs):
         self.update_meta_on_write(metadata, new_meta)
         return num_written
 
-    def update_meta_on_write(self, metadata, new_meta):
 
-        # Clear truncation after write
-        if 'truncated' in metadata:
-            metadata['truncated'] = False
+    #Hm. Ok. prob (self, path, new_length). I will come back to this
+    def update_meta_on_write(self, metadata, new_length):
 
         # Update len
         metadata.set_length(new_meta['length'])
